@@ -1,0 +1,62 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title P2P Parking Sharing - Диаграмма компонентов (Монолит)
+
+Container(parking_app, "P2P Parking Backend", "PHP, Symfony", "Монолитное серверное приложение")
+
+System_Boundary(parking_boundary, "P2P Parking Backend") {
+
+    Component(api_controller, "REST Controller", "Symfony Controllers", "HTTP REST API")
+
+    Component(auth_module, "Authentication Module", "Symfony Security, JWT", "Аутентификация и авторизация")
+
+    Component(user_module, "User Module", "PHP", "Управление пользователями и ролями")
+
+    Component(parking_module, "Parking Module", "PHP", "Парковочные места, тарифы и доступность")
+
+    Component(booking_module, "Booking Module", "PHP", "Создание и управление бронированиями")
+
+    Component(payment_module, "Payment Module", "PHP", "Обработка платежей и комиссия системы")
+
+    Component(review_module, "Review Module", "PHP", "Отзывы и рейтинги пользователей")
+
+    Component(notification_module, "Notification Module", "PHP", "Формирование уведомлений")
+
+    Component(validation_module, "Validation Module", "Symfony Validator", "Валидация данных")
+
+    Component(persistence_module, "Persistence Module", "Doctrine ORM", "Доступ к данным и репозитории")
+}
+
+ContainerDb(db_mysql, "MySQL", "Relational Database", "Основная база данных")
+
+System_Ext(payment_gateway, "Payment Gateway", "Внешний платёжный сервис")
+System_Ext(map_service, "Map Service", "Картографический сервис")
+System_Ext(notification_service, "Notification Service", "Email / Push сервис")
+
+Rel(api_controller, auth_module, "Проверка JWT и ролей", "PHP")
+Rel(api_controller, validation_module, "Валидация входных данных", "PHP")
+
+Rel(api_controller, user_module, "Управление пользователями", "PHP")
+Rel(api_controller, parking_module, "CRUD парковок", "PHP")
+Rel(api_controller, booking_module, "Бронирование", "PHP")
+Rel(api_controller, payment_module, "Оплата", "PHP")
+Rel(api_controller, review_module, "Отзывы", "PHP")
+
+Rel(booking_module, parking_module, "Проверка доступности", "PHP")
+Rel(booking_module, notification_module, "Подготовка уведомлений", "PHP")
+
+Rel(payment_module, payment_gateway, "Обработка платежей", "HTTPS")
+Rel(parking_module, map_service, "Геоданные", "HTTPS")
+Rel(notification_module, notification_service, "Отправка уведомлений", "HTTPS")
+
+Rel(user_module, persistence_module, "read/write", "Doctrine ORM")
+Rel(parking_module, persistence_module, "read/write", "Doctrine ORM")
+Rel(booking_module, persistence_module, "read/write", "Doctrine ORM")
+Rel(payment_module, persistence_module, "read/write", "Doctrine ORM")
+Rel(review_module, persistence_module, "read/write", "Doctrine ORM")
+Rel(auth_module, persistence_module, "read", "Doctrine ORM")
+
+Rel(persistence_module, db_mysql, "SQL", "MySQL")
+
+@enduml

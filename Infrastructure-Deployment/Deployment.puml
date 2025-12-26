@@ -1,0 +1,33 @@
+@startuml P2P_Parking_Sharing.Deployment
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Deployment.puml
+
+title "P2P Parking Sharing — Deployment Diagram"
+
+Person(user, "Пользователь", "Владелец / Водитель / Оператор")
+
+Deployment_Node(docker_host, "Application Server", "Docker Host", "Сервер развертывания") {
+
+    Deployment_Node(monolith_node, "P2P Parking Backend", "Docker", "Монолитное приложение PHP/Symfony") {
+        Container(parking_backend, "Backend Component", "PHP/Symfony", "Серверная часть с бизнес-логикой и уведомлениями")
+    }
+
+    Deployment_Node(db_node, "Database", "Docker", "Реляционная база данных MySQL") {
+        ContainerDb(mysql_db, "MySQL Database", "MySQL", "Хранение пользователей, парковок, бронирований и платежей")
+    }
+}
+
+System_Ext(payment_gateway, "Payment Gateway", "External System", "Внешний платёжный сервис")
+
+System_Ext(map_service, "Map Service", "External System", "Картографический сервис")
+
+Deployment_Node(user_device, "User Device", "Browser / Mobile App") {
+    Container(web_client, "Web Application", "Browser", "Веб-клиент системы")
+}
+
+Rel(user, web_client, "Использует", "HTTPS")
+Rel(web_client, parking_backend, "REST API", "HTTPS/JSON")
+Rel(parking_backend, mysql_db, "Чтение / запись данных", "MySQL Protocol")
+Rel(parking_backend, payment_gateway, "Обработка платежей", "HTTPS/REST")
+Rel(parking_backend, map_service, "Получение геоданных", "HTTPS/REST")
+
+@enduml

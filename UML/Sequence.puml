@@ -1,0 +1,71 @@
+@startuml P2P_Parking_Full_Sequence
+actor Driver
+actor Owner
+participant "Mobile/Web App" as App
+participant "API Gateway" as API
+participant "Booking Service" as Booking
+participant "Parking Service" as Parking
+participant "Payment Service" as Payment
+participant "Notification Service" as Notification
+participant "Map Service" as Map
+participant "Operator Service" as Operator
+
+== Поиск и выбор парковки ==
+Driver -> App: Ищет парковку (локация, дата/время)
+App -> API: GET /parking?location&datetime
+API -> Parking: Получить список доступных мест
+Parking -> Map: Получить координаты и карту
+Map --> Parking: Координаты
+Parking --> API: Список парковок с рейтингом и ценой
+API --> App: Отображение на карте
+App -> Driver: Выбор парковки
+
+== Бронирование и оплата ==
+Driver -> App: Забронировать место
+App -> API: POST /booking {parkingId, timeSlot, paymentInfo}
+API -> Booking: Проверка доступности
+Booking -> Parking: Проверка календаря
+alt Место доступно
+    Parking --> Booking: Доступно
+    Booking -> Payment: Снять оплату с водителя (эскроу)
+    Payment --> Booking: Подтверждение оплаты
+    Booking -> Notification: Уведомление владельца
+    Notification --> Owner: Информация о бронировании
+    Booking --> API: Booking Confirmed
+else Место занято
+    Booking --> API: Ошибка, место занято
+end
+API --> App: Результат бронирования
+App --> Driver: Показ результата
+
+== Завершение аренды и перевод оплаты ==
+Booking -> Booking: Отслеживание окончания бронированного времени
+alt Время аренды закончилось
+    Booking -> Payment: Перевод средств владельцу (удержание комиссии)
+    Payment --> Booking: Подтверждение перевода
+    Booking -> Notification: Уведомление водителя и владельца
+    Notification --> Driver: Информация о завершении аренды
+    Notification --> Owner: Подтверждение получения оплаты
+end
+
+== Оставление отзывов ==
+Driver -> App: Оставляет отзыв о парковке
+App -> API: POST /reviews
+API -> Booking: Связь с арендой
+Booking -> Reviews: Сохранение оценки
+Reviews --> API: Подтверждение
+API --> App: Подтверждение сохранения
+App --> Driver: Отображение успешного отзыва
+
+== Решение спорных ситуаций ==
+alt Проблема (например, место занято)
+    Driver -> App: Жалоба
+    App -> API: POST /dispute
+    API -> Operator: Передача спора
+    Operator -> Parking: Проверка информации
+    Operator -> Payment: Коррекция платежа (если нужно)
+    Operator --> API: Решение спора
+    API --> App: Результат спора
+    App --> Driver: Информация о решении
+end
+@enduml

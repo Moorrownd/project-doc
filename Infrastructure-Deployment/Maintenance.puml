@@ -1,72 +1,79 @@
-@startuml P2P_Parking_Sharing.Maintenance.Deployment
-title P2P Parking Sharing — Maintenance & Deployment
+@startuml P2P_Parking_Sharing.Maintenance
+!theme vibrant
 
-start
+title "P2P Parking Sharing — Maintenance & Operations"
 
-partition "Постоянный мониторинг системы" {
 
-  :Мониторинг контейнеров Docker\n(CPU, RAM);
-  :Мониторинг API\n(Response time < 1–2с);
-  :Мониторинг MySQL\n(соединения, блокировки);
-  :Проверка логов Symfony\n(errors / warnings);
-
+package "Docker Infrastructure" as docker_infra {
+  [Docker Host] as docker
+  [Backend Container\n(PHP / Symfony)] as backend_container
+  [MySQL Container] as db_container
 }
 
-if (Обнаружена высокая нагрузка?) then (да)
 
-  :Увеличение ресурсов контейнера\n(PHP-FPM / Web);
-  :Оптимизация SQL-запросов;
-  :Очистка кэша приложения;
+package "Обслуживание системы" as maintenance {
 
-elseif (Ошибки API / 5xx?) then (да)
+    actor "Системный администратор" as sys_admin
 
-  :Анализ логов Symfony;
-  if (Ошибка БД?) then (да)
-    :Проверка MySQL;
-    :Перезапуск контейнера БД;
-  else (нет)
-    :Перезапуск контейнера backend;
-  endif
+    package "Система мониторинга" as monitoring {
+        [Prometheus] as prometheus
+        [Grafana] as grafana
+    }
 
-else (Система стабильна)
-endif
-
-partition "Регулярное обслуживание (ежедневно / ночью)" {
-
-  :Автоматический backup MySQL;
-  :Проверка целостности данных;
-  :Очистка устаревших логов;
-  :Проверка свободного места на диске;
-
+    [Система логирования\n(Symfony Logs)] as logging
+    [Система резервного копирования\n(MySQL Backups)] as backup
 }
 
-partition "Развертывание обновлений" {
 
-  :Сборка Docker-образа;
-  :Прогон автоматических тестов\n(PHPUnit);
-  if (Тесты пройдены?) then (да)
-    :Остановка старого контейнера;
-    :Развертывание нового контейнера;
-    :Применение миграций БД;
-  else (нет)
-    :Отмена деплоя;
-  endif
+package "Внешние сервисы" as external {
 
+    package "Уведомления администратору" as alerts {
+        [Email] as email
+        [Telegram] as telegram
+    }
+
+    [Платёжный сервис] as payment_gateway
+    [Картографический сервис] as map_service
 }
 
-partition "Аварийные ситуации" {
+package "Разработка и CI/CD" as dev {
 
-  if (Недоступен внешний сервис?) then (да)
-    :Логирование ошибки;
-    :Повтор запроса / graceful degradation;
-  endif
+    actor "Разработчик" as developer
+    [Git Repository\n(GitHub / GitLab)] as git
 
-  if (Сбой платежей?) then (да)
-    :Блокировка операций бронирования;
-    :Уведомление оператора системы;
-  endif
+    package "CI/CD Pipeline" as cicd {
+        [Build Stage] as build
+        [Test Stage\n(PHPUnit)] as test
+        [Deploy Stage] as deploy
+    }
 
+    [Docker Registry] as registry
 }
 
-stop
+
+sys_admin --> grafana : Просмотр состояния системы
+grafana --> prometheus : Метрики (CPU, RAM, API, DB)
+prometheus --> alerts : Алерты при сбоях
+
+prometheus --> backend_container : Health checks
+prometheus --> db_container : DB metrics
+logging --> sys_admin : Ошибки и предупреждения
+
+
+backup --> db_container : Backup / Restore MySQL
+sys_admin --> backup : Контроль бэкапов
+
+
+developer --> git : PUSH коммитов
+git --> build : Триггер pipeline
+build --> test : Запуск тестов
+test --> registry : Сборка и PUSH Docker-образа
+registry --> deploy : PULL образа
+deploy --> docker : Обновление контейнера
+docker --> backend_container : Перезапуск backend
+
+
+backend_container --> payment_gateway : HTTPS API
+backend_container --> map_service : HTTPS API
+
 @enduml

@@ -1,108 +1,58 @@
-@startuml P2P_Parking_Sharing - Container Diagram
+@startuml P2P_Parking_Sharing_Container
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
 
-skinparam linetype ortho
-LAYOUT_LEFT_RIGHT()
-LAYOUT_WITH_LEGEND()
+title "P2P Parking Sharing — Диаграмма контейнеров"
 
-title P2P Parking Sharing — Container Diagram
+Person(owner, "Владелец парковочного места", "Добавляет парковки и управляет доступностью")
+Person(driver, "Водитель", "Ищет, бронирует и оплачивает парковку")
+Person(operator, "Оператор", "Разрешает споры и управляет системой")
 
-Person(owner, "Владелец парковочного места", "Добавляет свои парковочные места, управляет календарем и тарифами, получает оплату")
-Person(driver, "Арендатор (Водитель)", "Ищет и бронирует парковку, оплачивает онлайн, оставляет отзывы")
-Person(operator, "Оператор системы", "Управляет пользователями, разрешает споры, просматривает транзакции")
+System_Boundary(systemApp, "P2P Parking Sharing System") {
 
-System_Boundary(p2p_parking, "P2P Parking Sharing") {
+    Container(webApp, "Веб-приложение", "HTML / CSS / JS", "Пользовательский интерфейс для владельцев, водителей и операторов")
 
-    ' Клиентские приложения
-    Container(web_app, "Веб-приложение", "React, TypeScript", "SPA для владельцев, водителей и операторов")
-    Container(mobile_app, "Мобильное приложение", "React Native, TypeScript", "iOS/Android приложение для владельцев и водителей")
-    Container(api_gateway, "API Gateway", "Kotlin, Spring Cloud Gateway", "Маршрутизация, аутентификация, rate limiting")
+        owner --> webApp : "Использует интерфейс"
+        driver --> webApp : "Использует интерфейс"
+        operator --> webApp : "Использует интерфейс"
 
-    ' Общая инфраструктура
-    Container(message_broker, "RabbitMQ", "RabbitMQ", "Очереди/события для асинхронных задач")
-    Container(redis_cache, "Redis", "Redis", "Кэш для сессий и поиска")
+    Container(backendApp, "Серверное приложение", "PHP + Symfony", "Монолитное приложение с бизнес-логикой системы")
 
-    ' Микросервисы
-    together {
+        webApp --> backendApp : "REST API : HTTPS"
 
-        Container_Boundary(auth_b, "Auth Service") {
-            Container(auth_service, "Auth API", "Kotlin, Spring Boot", "Регистрация, авторизация, RBAC, JWT/OAuth")
-            ContainerDb(auth_db, "Auth DB", "PostgreSQL", "Пользователи, роли, refresh tokens")
-        }
+    Container(authModule, "Модуль аутентификации", "Symfony Security + JWT", "Регистрация, вход и проверка прав пользователей")
 
-        Container_Boundary(parking_b, "Parking Service") {
-            Container(parking_service, "Parking API", "Kotlin, Spring Boot", "Добавление, редактирование и управление парковочными местами")
-            ContainerDb(parking_db, "Parking DB", "PostgreSQL", "Парковочные места, календарь, тарифы, фото")
-        }
+        backendApp --> authModule : "Аутентификация и авторизация"
 
-        Container_Boundary(booking_b, "Booking Service") {
-            Container(booking_service, "Booking API", "Kotlin, Spring Boot", "Бронирование парковки, проверка доступности")
-            ContainerDb(booking_db, "Booking DB", "PostgreSQL", "Бронирования, статус, история")
-        }
+    Container(parkingModule, "Модуль парковок", "PHP", "Управление парковочными местами, тарифами и доступностью")
 
-        Container_Boundary(payment_b, "Payment Service") {
-            Container(payment_service, "Payment API", "Kotlin, Spring Boot", "Обработка платежей, удержание комиссии")
-            ContainerDb(payment_db, "Payment DB", "PostgreSQL", "Транзакции, счета, комиссии")
-        }
+        backendApp --> parkingModule : "Управление парковками"
 
-        Container_Boundary(reviews_b, "Reviews Service") {
-            Container(reviews_service, "Reviews API", "Kotlin, Spring Boot", "Отзывы и рейтинги пользователей")
-            ContainerDb(reviews_db, "Reviews DB", "PostgreSQL", "Отзывы, оценки, агрегаты рейтинга")
-        }
+    Container(bookingModule, "Модуль бронирования", "PHP", "Создание и управление бронированиями")
 
-        Container_Boundary(operator_b, "Operator Service") {
-            Container(operator_service, "Operator API", "Kotlin, Spring Boot", "Разрешение споров, управление пользователями, просмотр транзакций")
-            ContainerDb(operator_db, "Operator DB", "PostgreSQL", "Споры, действия операторов, журналы")
-        }
-    }
+        backendApp --> bookingModule : "Бронирование парковок"
+
+    Container(paymentModule, "Модуль оплаты", "PHP", "Обработка оплат и комиссий")
+
+        backendApp --> paymentModule : "Оплата бронирований"
+
+    Container(reviewModule, "Модуль отзывов", "PHP", "Отзывы и рейтинги пользователей")
+
+        backendApp --> reviewModule : "Управление отзывами"
+
+    ContainerDb(mainDb, "Общая база данных", "MySQL", "Пользователи, парковки, бронирования, платежи, отзывы")
+
+        authModule --> mainDb : "Чтение / запись данных"
+        parkingModule --> mainDb : "Чтение / запись данных"
+        bookingModule --> mainDb : "Чтение / запись данных"
+        paymentModule --> mainDb : "Чтение / запись данных"
+        reviewModule --> mainDb : "Чтение / запись данных"
 }
 
-' ===== Пользователи -> приложения =====
-Rel(owner, web_app, "Использует", "HTTPS")
-Rel(owner, mobile_app, "Использует", "HTTPS")
-Rel(driver, web_app, "Использует", "HTTPS")
-Rel(driver, mobile_app, "Использует", "HTTPS")
-Rel(operator, web_app, "Использует", "HTTPS")
+Container_Ext(paymentGateway, "Платежная система", "External API", "Обработка онлайн-платежей")
 
-' ===== Приложения -> API Gateway =====
-Rel(web_app, api_gateway, "API", "HTTPS")
-Rel(mobile_app, api_gateway, "API", "HTTPS")
+Container_Ext(mapService, "Картографический сервис", "External API", "Карты и геолокация")
 
-' ===== Gateway -> сервисы =====
-Rel(api_gateway, auth_service, "Auth / RBAC", "HTTP")
-Rel(api_gateway, parking_service, "CRUD парковок", "HTTP")
-Rel(api_gateway, booking_service, "Бронирование", "HTTP")
-Rel(api_gateway, payment_service, "Оплата", "HTTP")
-Rel(api_gateway, reviews_service, "Отзывы и рейтинги", "HTTP")
-Rel(api_gateway, operator_service, "Действия операторов", "HTTP")
-
-' ===== Сервисы -> свои БД =====
-Rel(auth_service, auth_db, "read/write", "JDBC")
-Rel(parking_service, parking_db, "read/write", "JDBC")
-Rel(booking_service, booking_db, "read/write", "JDBC")
-Rel(payment_service, payment_db, "read/write", "JDBC")
-Rel(reviews_service, reviews_db, "read/write", "JDBC")
-Rel(operator_service, operator_db, "read/write", "JDBC")
-
-' ===== Внешние зависимости =====
-System_Ext(payment_gateway, "Платежный сервис", "Обработка онлайн-платежей")
-System_Ext(map_service, "Картографический сервис", "Геолокация и карты парковок")
-System_Ext(notification_service, "Сервис уведомлений", "Уведомления о бронировании и оплате")
-
-Rel(payment_service, payment_gateway, "Обработка платежей", "HTTPS/REST")
-Rel(booking_service, map_service, "Получение карт и геолокации", "HTTPS/REST")
-Rel(booking_service, notification_service, "Отправка уведомлений", "HTTPS/REST")
-
-' ===== Сервисы -> RabbitMQ и Redis =====
-Rel(auth_service, redis_cache, "Сессии / refresh", "TCP")
-Rel(parking_service, redis_cache, "Кэш парковок", "TCP")
-Rel(booking_service, redis_cache, "Кэш поиска парковок", "TCP")
-Rel(reviews_service, redis_cache, "Кэш рейтингов", "TCP")
-
-Rel(parking_service, message_broker, "Publish: ParkingChanged", "AMQP")
-Rel(booking_service, message_broker, "Publish: BookingCreated", "AMQP")
-Rel(payment_service, message_broker, "Publish: PaymentCompleted", "AMQP")
-Rel(reviews_service, message_broker, "Publish: ReviewCreated", "AMQP")
-Rel(operator_service, message_broker, "Consume/Publish: DisputeResolved", "AMQP")
+paymentModule --> paymentGateway : "Оплата : HTTPS"
+parkingModule --> mapService : "Получение координат : HTTPS"
 
 @enduml
